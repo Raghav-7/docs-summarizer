@@ -175,77 +175,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // Use dynamic tool endpoint if available, else fallback
             const apiUrl = (window.TOOL_CONFIG && window.TOOL_CONFIG.apiEndpoint) || '/api/summarize';
-            const response = await fetch(apiUrl, {
+            
+            // 1. Kick off concurrent requests
+            const statsPromise = fetch(apiUrl + '/stats', {
                 method: 'POST',
                 body: formData
+            }).then(async res => {
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Stats Error');
+                return json;
+            }).catch(e => {
+                console.warn("Fast stats failed:", e);
+                return null;
             });
 
-            const data = await response.json();
+            const aiPromise = fetch(apiUrl, {
+                method: 'POST',
+                body: formData
+            }).then(async res => {
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Server Error');
+                return json;
+            });
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Server Error');
-            }
-            
-            // Finish loader
-            clearInterval(loaderInterval);
-            progressFill.style.width = '100%';
-            progressText.textContent = '100%';
-            
-            // Store globally for exports
-            globalStats = data.stats;
-            globalTimeSeries = data.time_series;
-            globalFilteredStats = data.stats;
-            globalMediaStats = data.media;
-            globalEmojis = data.emojis;
-            globalLinks = data.links;
-            currentChatId = data.chat_id;
+            // 2. Await Fast Stats and Render
+            const statsData = await statsPromise;
+            const toolName = window.TOOL_CONFIG ? window.TOOL_CONFIG.name : 'summarize';
 
-            setTimeout(() => {
-                const toolName = window.TOOL_CONFIG ? window.TOOL_CONFIG.name : 'summarize';
+            if (statsData && !statsData.error) {
+                globalStats = statsData.stats;
+                globalTimeSeries = statsData.time_series;
+                globalFilteredStats = statsData.stats;
+                globalMediaStats = statsData.media;
+                globalEmojis = statsData.emojis;
+                globalLinks = statsData.links;
+                
+                loadingState.classList.add('hidden');
                 
                 if (toolName === 'statistics') {
-                    // Render Power BI Analytics Dashboard
                     document.getElementById('analyticsGrid').style.display = 'flex';
-                    renderAnalyticsDashboard(data);
-                } else if (toolName === 'search') {
-                    // Render Focus Mode Chat
-                    document.getElementById('focusChatLayout').style.display = 'flex';
-                    document.getElementById('chatWidget').classList.remove('hidden');
-                } else {
-                    // Default Layout (Summarize, Action Items, Sentiment, Export)
+                    renderAnalyticsDashboard(statsData);
+                    clearInterval(loaderInterval);
+                } else if (toolName !== 'search') {
                     const dashboardEl = document.querySelector('.dashboard');
                     if(dashboardEl) dashboardEl.style.display = 'flex';
-                    document.getElementById('chatWidget').classList.remove('hidden');
                     
-                    // Render markdown using marked
-                    if (toolName === 'action-items') {
-                        // Special rendering for action items
-                        summaryText.innerHTML = renderChecklists(data.response || "No action items found.");
-                    } else {
-                        summaryText.innerHTML = marked.parse(data.response || "No summary generated.");
-                    }
+                    const sumCont = document.getElementById('summaryContent');
+                    if(sumCont) sumCont.classList.remove('hidden');
                     
-                    if (data.profiles) {
-                        profilesText.innerHTML = marked.parse(data.profiles);
-                        profilesContainer.classList.remove('hidden');
-                    } else {
-                        profilesContainer.classList.add('hidden');
-                    }
+                    summaryText.innerHTML = '<div style="text-align:center; padding: 40px;"><div class="spinner" style="border-top-color: var(--primary); margin: 0 auto 16px auto;"></div><p style="color:var(--text-muted);">AI is reading your chat to generate deep insights...</p></div>';
                     
-                    // Toggle visibility of stats column based on tool config and data
                     const statsCol = document.getElementById('statsColumn');
                     const toolShowsStats = window.TOOL_CONFIG ? window.TOOL_CONFIG.showStats : true;
-                    if (data.is_document || !toolShowsStats || !data.stats || Object.keys(data.stats).length === 0) {
-                        if (statsCol) statsCol.classList.add('hidden');
-                        if(exportExcelBtn) exportExcelBtn.classList.add('hidden');
-                    } else {
+                    if (!statsData.is_document && toolShowsStats && statsData.stats && Object.keys(statsData.stats).length > 0) {
                         if (statsCol) statsCol.classList.remove('hidden');
                         if(exportExcelBtn) exportExcelBtn.classList.remove('hidden');
-                        // Render Chart if stats exist
-                        if (data.time_series && Object.keys(data.time_series).length > 0) {
-                            const dates = Object.keys(data.time_series).sort();
+                        
+                        if (statsData.time_series && Object.keys(statsData.time_series).length > 0) {
+                            const dates = Object.keys(statsData.time_series).sort();
                             if (dates.length > 0) {
                                 dateFrom.value = dates[0];
                                 dateTo.value = dates[dates.length - 1];
@@ -255,20 +243,48 @@ document.addEventListener('DOMContentLoaded', () => {
                                 dateTo.max = dates[dates.length - 1];
                             }
                             updateChartFromDates();
-                        } else if (data.stats && Object.keys(data.stats).length > 0) {
-                            renderChart(data.stats);
+                        } else if (statsData.stats && Object.keys(statsData.stats).length > 0) {
+                            renderChart(statsData.stats);
                         }
-                        // Render Media Stats if exist
-                        if (data.media || data.emojis) {
-                            renderMediaStats(data.media, data.emojis);
+                        if (statsData.media || statsData.emojis) {
+                            renderMediaStats(statsData.media, statsData.emojis);
                         }
                     }
                 }
-                
-                loadingState.classList.add('hidden');
+            }
+
+            // 3. Await Deep AI Analysis
+            const data = await aiPromise;
+            
+            // Finish loader
+            clearInterval(loaderInterval);
+            progressFill.style.width = '100%';
+            progressText.textContent = '100%';
+            loadingState.classList.add('hidden');
+            
+            currentChatId = data.chat_id;
+            
+            if (toolName === 'search') {
+                document.getElementById('focusChatLayout').style.display = 'flex';
+                document.getElementById('chatWidget').classList.remove('hidden');
+            } else if (toolName !== 'statistics') {
                 const sumCont = document.getElementById('summaryContent');
                 if(sumCont) sumCont.classList.remove('hidden');
-            }, 500);
+                document.getElementById('chatWidget').classList.remove('hidden');
+                
+                if (toolName === 'action-items') {
+                    summaryText.innerHTML = renderChecklists(data.response || "No action items found.");
+                } else {
+                    summaryText.innerHTML = marked.parse(data.response || "No summary generated.");
+                }
+                
+                if (data.profiles) {
+                    profilesText.innerHTML = marked.parse(data.profiles);
+                    profilesContainer.classList.remove('hidden');
+                } else {
+                    profilesContainer.classList.add('hidden');
+                }
+            }
 
         } catch (error) {
             clearInterval(loaderInterval);

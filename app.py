@@ -411,6 +411,64 @@ def history():
     return render_template('history.html', summaries=summaries)
 
 # ─── Unified Tool API ─────────────────────────────────────────────
+
+@app.route('/api/tool/<tool_name>/stats', methods=['POST'])
+def api_tool_stats(tool_name):
+    if tool_name not in TOOLS:
+        return jsonify({'error': 'Unknown tool'}), 400
+
+    raw_text = request.form.get('raw_text')
+    file = request.files.get('file')
+    
+    if not file and not raw_text:
+        return jsonify({'error': 'No file uploaded or text provided'}), 400
+
+    chat_text = ""
+    is_document = False
+    
+    try:
+        if raw_text:
+            chat_text = raw_text
+        else:
+            filename = file.filename
+            if filename.lower().endswith('.pdf'):
+                is_document = True
+            elif filename.lower().endswith('.zip'):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    file_path = os.path.join(temp_dir, file.filename)
+                    file.save(file_path)
+                    with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                    for root, _, files in os.walk(temp_dir):
+                        for f in files:
+                            if f.endswith('.txt'):
+                                full_path = os.path.join(root, f)
+                                with open(full_path, 'r', encoding='utf-8') as txt_file:
+                                    chat_text = txt_file.read()
+            else:
+                chat_text = file.read().decode('utf-8', errors='ignore')
+                # Need to seek back to 0 so the next request (if the file is read again? Wait, the next request is a completely separate HTTP POST request from the frontend)
+                
+        if is_document:
+            return jsonify({'is_document': True})
+            
+        formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links = parse_chat(chat_text)
+        if not formatted_chat:
+             return jsonify({'error': 'Could not parse any messages from the uploaded file.'}), 400
+             
+        return jsonify({
+            'is_document': False,
+            'stats': stats,
+            'time_series': time_series,
+            'hourly_activity': hourly_activity,
+            'media': media_stats,
+            'emojis': top_emojis,
+            'links': shared_links
+        })
+    except Exception as e:
+        print(f"Stats Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/tool/<tool_name>', methods=['POST'])
 def api_tool(tool_name):
     if tool_name not in TOOLS:
