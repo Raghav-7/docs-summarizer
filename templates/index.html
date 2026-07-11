@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocuChat — AI Chat Analyzer</title>
-    <meta name="description" content="Upload your WhatsApp export or any document and get instant AI-powered summaries, analytics, and follow-up Q&A.">
+    <title>ChatRecap - Free AI WhatsApp Chat Analyzer & Summarizer</title>
+    <meta name="description" content="Export and summarize your WhatsApp group chats instantly. Get personality profiles, message statistics, and AI chat analysis for free.">
+    <meta name="keywords" content="WhatsApp analyzer, WhatsApp chat summary, export WhatsApp chat to PDF, WhatsApp wrapped">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,8 +17,8 @@
         <!-- Top Navigation Bar -->
         <nav class="topbar">
             <a href="/" class="topbar-brand">
-                <div class="topbar-logo">D</div>
-                <span class="topbar-title">DocuChat</span>
+                <div class="topbar-logo">C</div>
+                <span class="topbar-title">ChatRecap</span>
             </a>
             <div class="topbar-actions">
                 {% if session.get('logged_in') %}
@@ -30,8 +31,8 @@
         <!-- Main Content -->
         <main class="container">
             <div class="page-header">
-                <h1>Analyze any conversation</h1>
-                <p>Upload a WhatsApp export or document to get an AI-powered summary, analytics dashboard, and interactive Q&A.</p>
+                <h1>Analyze your WhatsApp Chats with AI</h1>
+                <p>Upload a WhatsApp export to get an instant AI-powered summary, personality profiles, analytics dashboard, and interactive Q&A.</p>
             </div>
             
             <div class="ad-banner" style="margin-bottom: 24px;">Advertisement</div>
@@ -182,7 +183,7 @@
 
         <!-- Footer -->
         <footer class="site-footer">
-            <p>&copy; 2026 DocuChat.
+            <p>&copy; 2026 ChatRecap.
             {% if not session.get('logged_in') %}
                 <a href="{{ url_for('login') }}">Admin</a>
             {% endif %}

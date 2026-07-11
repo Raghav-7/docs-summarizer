@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ tool.title }} — DocuChat</title>
+    <title>{{ tool.title }} | ChatRecap</title>
     <meta name="description" content="{{ tool.long_description }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,8 +16,8 @@
     <div class="app-shell">
         <nav class="topbar">
             <a href="/" class="topbar-brand">
-                <div class="topbar-logo">D</div>
-                <span class="topbar-title">DocuChat</span>
+                <div class="topbar-logo">C</div>
+                <span class="topbar-title">ChatRecap</span>
             </a>
             <div class="topbar-actions">
                 <a href="/" class="btn ghost">All Tools</a>
@@ -279,7 +279,7 @@
         </main>
 
         <footer class="site-footer">
-            <p>&copy; 2026 DocuChat. <a href="/">All Tools</a>
+            <p>&copy; 2026 ChatRecap. <a href="/">All Tools</a>
             {% if not session.get('logged_in') %}
                 · <a href="{{ url_for('login') }}">Admin</a>
             {% endif %}

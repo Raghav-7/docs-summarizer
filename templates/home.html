@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocuChat — AI-Powered Chat & Document Analysis</title>
+    <title>ChatRecap — AI-Powered WhatsApp Chat Analysis</title>
     <meta name="description" content="Every tool you need to analyze WhatsApp chats and documents. Summarize, extract action items, track sentiment, get statistics, and more.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,8 +12,8 @@
     <div class="app-shell">
         <nav class="topbar">
             <a href="/" class="topbar-brand">
-                <div class="topbar-logo">D</div>
-                <span class="topbar-title">DocuChat</span>
+                <div class="topbar-logo">C</div>
+                <span class="topbar-title">ChatRecap</span>
             </a>
             <div class="topbar-actions">
                 {% if session.get('logged_in') %}
@@ -95,7 +95,7 @@
         </main>
 
         <footer class="site-footer">
-            <p>&copy; 2026 DocuChat. Free to use — {{ limit }} analyses per day.
+            <p>&copy; 2026 ChatRecap. Free to use — {{ limit }} analyses per day.
             {% if not session.get('logged_in') %}
                 · <a href="{{ url_for('login') }}">Admin</a>
             {% endif %}
