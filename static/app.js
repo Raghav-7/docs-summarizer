@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const apiUrl = (window.TOOL_CONFIG && window.TOOL_CONFIG.apiEndpoint) || '/api/summarize';
             
-            // 1. Kick off concurrent requests
+            // 1. Kick off Fast Stats request FIRST
             const statsPromise = fetch(apiUrl + '/stats', {
                 method: 'POST',
                 body: formData
@@ -185,22 +185,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const json = await res.json();
                 if (!res.ok) throw new Error(json.error || 'Stats Error');
                 return json;
-            }).catch(e => {
-                console.warn("Fast stats failed:", e);
-                return null;
-            });
-
-            const aiPromise = fetch(apiUrl, {
-                method: 'POST',
-                body: formData
-            }).then(async res => {
-                const json = await res.json();
-                if (!res.ok) throw new Error(json.error || 'Server Error');
-                return json;
             });
 
             // 2. Await Fast Stats and Render
-            const statsData = await statsPromise;
+            let statsData;
+            try {
+                statsData = await statsPromise;
+            } catch (e) {
+                console.warn("Fast stats failed:", e);
+                statsData = null;
+            }
+            
             const toolName = window.TOOL_CONFIG ? window.TOOL_CONFIG.name : 'summarize';
 
             if (statsData && !statsData.error) {
@@ -253,8 +248,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 3. Await Deep AI Analysis
-            const data = await aiPromise;
+            // 3. Await Deep AI Analysis using file_id if available
+            if (toolName !== 'statistics') {
+                const aiFormData = new FormData();
+                if (summaryTypeSelect) {
+                    aiFormData.append('summary_type', summaryTypeSelect.value);
+                }
+                
+                if (statsData && statsData.file_id) {
+                    aiFormData.append('file_id', statsData.file_id);
+                } else {
+                    if (activeMode === 'upload') {
+                        aiFormData.append('file', currentFile);
+                    } else {
+                        aiFormData.append('raw_text', pasteInput.value);
+                    }
+                }
+
+                const data = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: aiFormData
+                }).then(async res => {
+                    const json = await res.json();
+                    if (!res.ok) throw new Error(json.error || 'Server Error');
+                    return json;
+                });
             
             // Finish loader
             clearInterval(loaderInterval);
@@ -284,7 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     profilesContainer.classList.add('hidden');
                 }
-            }
+                }
+            } // Close if (toolName !== 'statistics')
 
         } catch (error) {
             clearInterval(loaderInterval);

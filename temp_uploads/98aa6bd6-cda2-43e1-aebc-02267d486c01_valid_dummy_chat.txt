@@ -1,0 +1,3 @@
+﻿([01/01/26, 12:00:00] Alice: Hey guys, what is up?
+[01/01/26, 12:05:00] Bob: Not much, just working.
+[01/01/26, 12:10:00] Charlie: Let us grab lunch later!)

@@ -14,7 +14,13 @@ from fpdf import FPDF
 from flask_sqlalchemy import SQLAlchemy
 import google.generativeai as genai
 from datetime import datetime, date
+import sys
+import shutil
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+
+TEMP_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'temp_uploads')
+os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 import emoji
 import uuid
 
@@ -481,19 +487,23 @@ def api_tool_stats(tool_name):
 
     chat_text = ""
     is_document = False
+    file_id = None
     
     try:
         if raw_text:
             chat_text = raw_text
         else:
             filename = file.filename
+            file_id = str(uuid.uuid4())
+            cached_path = os.path.join(TEMP_UPLOAD_DIR, file_id + '_' + secure_filename(filename))
+            file.seek(0)
+            file.save(cached_path)
+            
             if filename.lower().endswith('.pdf'):
                 is_document = True
             elif filename.lower().endswith('.zip'):
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    file_path = os.path.join(temp_dir, file.filename)
-                    file.save(file_path)
-                    with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    with zipfile.ZipFile(cached_path, 'r') as zip_ref:
                         zip_ref.extractall(temp_dir)
                     for root, _, files in os.walk(temp_dir):
                         for f in files:
@@ -502,17 +512,18 @@ def api_tool_stats(tool_name):
                                 with open(full_path, 'r', encoding='utf-8') as txt_file:
                                     chat_text = txt_file.read()
             else:
-                chat_text = file.read().decode('utf-8', errors='ignore')
-                # Need to seek back to 0 so the next request (if the file is read again? Wait, the next request is a completely separate HTTP POST request from the frontend)
+                with open(cached_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    chat_text = f.read()
                 
         if is_document:
-            return jsonify({'is_document': True})
+            return jsonify({'is_document': True, 'file_id': file_id})
             
         formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links, advanced_stats = parse_chat(chat_text)
         if not formatted_chat:
              return jsonify({'error': 'Could not parse any messages from the uploaded file.'}), 400
              
         return jsonify({
+            'file_id': file_id,
             'is_document': False,
             'stats': stats,
             'time_series': time_series,
@@ -542,10 +553,11 @@ def api_tool(tool_name):
     tool = TOOLS[tool_name]
     raw_text = request.form.get('raw_text')
     file = request.files.get('file')
+    file_id = request.form.get('file_id')
     instruction = tool['prompt']
     
-    if not file and not raw_text:
-        return jsonify({'error': 'No file uploaded or text provided'}), 400
+    if not file and not raw_text and not file_id:
+        return jsonify({'error': 'No file uploaded, text provided, or file ID given'}), 400
         
     if file:
         file.seek(0, os.SEEK_END)
@@ -578,10 +590,21 @@ def api_tool(tool_name):
             prompt_contents.append(f"{instruction}{profiles_instruction}\n\nChat Log:\n{formatted_chat}")
             
         else:
-            filename = file.filename
+            if file_id:
+                cached_files = [f for f in os.listdir(TEMP_UPLOAD_DIR) if f.startswith(file_id + '_')]
+                if not cached_files:
+                    return jsonify({'error': 'Cached file not found. Please upload again.'}), 400
+                cached_path = os.path.join(TEMP_UPLOAD_DIR, cached_files[0])
+                filename = cached_files[0].split('_', 1)[1]
+            else:
+                filename = file.filename
+                
             with tempfile.TemporaryDirectory() as temp_dir:
-                file_path = os.path.join(temp_dir, file.filename)
-                file.save(file_path)
+                file_path = os.path.join(temp_dir, filename)
+                if file_id:
+                    shutil.copy(cached_path, file_path)
+                else:
+                    file.save(file_path)
                 
                 if filename.lower().endswith('.pdf'):
                     is_document = True
