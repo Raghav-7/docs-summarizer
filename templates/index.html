@@ -126,6 +126,8 @@
                                 </div>
                                 <canvas id="statsChart"></canvas>
                             </div>
+                            
+                            <div class="ad-banner" style="margin: 24px 0;">Advertisement (In-Feed)</div>
 
                             <div id="profilesContainer" class="hidden">
                                 <h3>Personality Profiles</h3>
@@ -190,6 +192,11 @@
             {% endif %}
             </p>
         </footer>
+    </div>
+    
+    <!-- Sticky Mobile Ad Footer -->
+    <div class="sticky-ad-footer" style="position: fixed; bottom: 0; left: 0; width: 100%; background: var(--bg-card); border-top: 1px solid var(--border); padding: 8px; text-align: center; z-index: 1000; display: flex; justify-content: center; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
+        <div class="ad-banner" style="margin: 0; width: 100%; max-width: 320px; height: 50px; font-size: 12px; line-height: 50px;">Mobile Ad (320x50)</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
