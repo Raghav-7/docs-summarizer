@@ -238,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingState.classList.add('hidden');
                 
                 if (toolName === 'statistics') {
+                    summaryContent.classList.remove('hidden');
                     document.getElementById('analyticsGrid').style.display = 'flex';
                     renderAnalyticsDashboard(statsData);
                     clearInterval(loaderInterval);
