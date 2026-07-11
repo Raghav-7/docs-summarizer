@@ -302,12 +302,8 @@
             </section>
         </main>
 
-        <footer class="site-footer">
-            <p>&copy; 2026 ChatRecap. <a href="/">All Tools</a>
-            {% if not session.get('logged_in') %}
-                · <a href="{{ url_for('login') }}">Admin</a>
-            {% endif %}
-            </p>
+        <footer style="text-align: center; margin-top: 64px; margin-bottom: 24px; padding-top: 32px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px;">
+            <p>&copy; 2026 ChatRecap. <a href="{{ url_for('index') }}" style="color: var(--text-muted);">All Tools</a> &middot; <a href="{{ url_for('contact') }}" style="color: var(--text-muted);">Contact Support</a> &middot; <a href="{{ url_for('login') }}" style="color: var(--text-muted);">Admin</a></p>
         </footer>
     </div>
 

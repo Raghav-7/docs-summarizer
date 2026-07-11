@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Support - WhatsApp Summarizer AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .contact-card {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+        .flash-messages {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .flash-messages .error {
+            color: #ef4444;
+            background: #fef2f2;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #fca5a5;
+            font-size: 0.9rem;
+        }
+        .flash-messages .success {
+            color: #059669;
+            background: #ecfdf5;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #6ee7b7;
+            font-size: 0.9rem;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-main);
+            color: var(--text-main);
+            font-family: inherit;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        .nav-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+        .nav-back:hover {
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+    <main class="container" style="padding-top: 48px;">
+        <a href="{{ url_for('index') }}" class="nav-back">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Home
+        </a>
+        
+        <header style="text-align: center; margin-bottom: 32px;">
+            <h1>Contact Support</h1>
+            <p>Having trouble with the app or want to leave feedback? Send us a message.</p>
+        </header>
+
+        <section class="card contact-card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="flash-messages">
+                  {% for category, message in messages %}
+                    <div class="{{ category }}">{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('contact') }}" method="POST">
+                <div class="form-group">
+                    <label for="name">Your Name</label>
+                    <input type="text" id="name" name="name" required placeholder="John Doe">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required placeholder="john@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message" required placeholder="How can we help you?"></textarea>
+                </div>
+                
+                <button type="submit" class="btn primary" style="width: 100%; margin-top: 8px;">Send Message</button>
+            </form>
+        </section>
+        
+        <footer style="text-align: center; margin-top: 64px; margin-bottom: 24px; padding-top: 32px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px;">
+            <p>&copy; 2026 ChatRecap. All Rights Reserved.</p>
+        </footer>
+    </main>
+</body>
+</html>

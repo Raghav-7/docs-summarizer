@@ -234,30 +234,41 @@ class Usage(db.Model):
     use_date = db.Column(db.Date, default=date.today)
     count = db.Column(db.Integer, default=0)
 
+class ContactMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    email = db.Column(db.String(255))
+    message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    read = db.Column(db.Boolean, default=False)
+
 # Create tables
 with app.app_context():
     db.create_all()
 
 # ─── Usage Limiter ────────────────────────────────────────────────
+def get_client_ip():
+    """Get the true client IP address, handling reverse proxies."""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    return request.remote_addr or '127.0.0.1'
+
 def get_usage_count():
-    """Get today's usage count for current session."""
-    uid = session.get('uid')
-    if not uid: return 0
+    """Get today's usage count for current IP."""
+    ip = get_client_ip()
     today = date.today()
-    usage = Usage.query.filter_by(ip_address=uid, use_date=today).first()
+    usage = Usage.query.filter_by(ip_address=ip, use_date=today).first()
     return usage.count if usage else 0
 
 def increment_usage():
-    """Increment today's usage count for current session."""
-    if 'uid' not in session:
-        session['uid'] = str(uuid.uuid4())
-    uid = session['uid']
+    """Increment today's usage count for current IP."""
+    ip = get_client_ip()
     today = date.today()
-    usage = Usage.query.filter_by(ip_address=uid, use_date=today).first()
+    usage = Usage.query.filter_by(ip_address=ip, use_date=today).first()
     if usage:
         usage.count += 1
     else:
-        usage = Usage(ip_address=uid, use_date=today, count=1)
+        usage = Usage(ip_address=ip, use_date=today, count=1)
         db.session.add(usage)
     db.session.commit()
 
@@ -265,8 +276,6 @@ def check_rate_limit():
     """Check if current user has exceeded free limit. Returns (allowed, remaining)."""
     if session.get('logged_in'):
         return True, 999  # Admin has unlimited
-    if 'uid' not in session:
-        session['uid'] = str(uuid.uuid4())
     used = get_usage_count()
     remaining = max(0, FREE_DAILY_LIMIT - used)
     return remaining > 0, remaining
@@ -738,6 +747,26 @@ def chat():
         else:
             user_msg = "An unexpected error occurred. Please try again."
         return jsonify({'error': user_msg}), 500
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        message_text = request.form.get('message')
+        
+        if not name or not email or not message_text:
+            flash('Please fill in all fields.', 'error')
+            return redirect(url_for('contact'))
+            
+        new_msg = ContactMessage(name=name, email=email, message=message_text)
+        db.session.add(new_msg)
+        db.session.commit()
+        
+        flash('Your message has been sent successfully! We will get back to you soon.', 'success')
+        return redirect(url_for('contact'))
+        
+    return render_template('contact.html')
 
 @app.route('/api/export-pdf', methods=['POST'])
 def export_pdf():

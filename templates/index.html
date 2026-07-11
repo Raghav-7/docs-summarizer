@@ -187,6 +187,7 @@
         <!-- Footer -->
         <footer class="site-footer">
             <p>&copy; 2026 ChatRecap.
+            <a href="{{ url_for('contact') }}" style="margin-left: 8px;">Contact Support</a> &middot; 
             {% if not session.get('logged_in') %}
                 <a href="{{ url_for('login') }}">Admin</a>
             {% endif %}
