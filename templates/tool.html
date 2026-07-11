@@ -125,54 +125,75 @@
 
                     {% if tool_name == 'statistics' %}
                     <!-- Layout B: Power BI Analytics -->
-                    <div class="analytics-dashboard-grid" id="analyticsGrid" style="display: none;">
-                        <div class="kpi-row">
-                            <div class="kpi-card"><h3>Total Messages</h3><div id="kpiMessages" class="kpi-value">0</div></div>
-                            <div class="kpi-card"><h3>Media & Links</h3><div id="kpiMedia" class="kpi-value">0</div></div>
-                            <div class="kpi-card"><h3>Most Active</h3><div id="kpiTopUser" class="kpi-value">-</div></div>
+                    <div class="analytics-dashboard-grid" id="analyticsGrid" style="display: none; display: flex; flex-direction: column; gap: 24px;">
+                        <div class="kpi-row" id="advKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+                            <div class="kpi-card" style="background:#0f766e; color:white; padding: 24px;">
+                                <h3 style="color:rgba(255,255,255,0.9); margin-bottom: 8px;">Days Chatted</h3>
+                                <div id="kpiDays" class="kpi-value" style="color:white; font-size: 3rem;">0</div>
+                            </div>
+                            <div class="kpi-card" style="background:#d97706; color:white; padding: 24px;">
+                                <h3 style="color:rgba(255,255,255,0.9); margin-bottom: 8px;">Total Messages</h3>
+                                <div id="kpiTotalMessages" class="kpi-value" style="color:white; font-size: 3rem;">0</div>
+                            </div>
+                            <div class="kpi-card" style="background:#db2777; color:white; padding: 24px;">
+                                <h3 style="color:rgba(255,255,255,0.9); margin-bottom: 8px;">Total People</h3>
+                                <div id="kpiPeople" class="kpi-value" style="color:white; font-size: 3rem;">0</div>
+                            </div>
                         </div>
-                        <div class="chart-row">
-                            <div class="chart-card full-width">
-                                <h3>Messages Over Time</h3>
-                                <div style="position: relative; height: 300px; width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div>
+                                <h3 style="margin-bottom: 4px; color: var(--text-secondary); font-size: 14px;">First Message</h3>
+                                <h2 id="kpiFirstDate" style="font-size: 24px; margin: 0;">-</h2>
+                            </div>
+                            <div style="text-align: right;">
+                                <h3 style="margin-bottom: 4px; color: var(--text-secondary); font-size: 14px;">Last Message</h3>
+                                <h2 id="kpiLastDate" style="font-size: 24px; margin: 0;">-</h2>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-row" style="display: flex; gap: 24px;">
+                            <div class="chart-card full-width" style="flex: 1; padding: 24px;">
+                                <h3 style="text-align: center; margin-bottom: 16px;">Messages per Day</h3>
+                                <div style="position: relative; height: 350px; width: 100%;">
                                     <canvas id="timelineChart"></canvas>
                                 </div>
                             </div>
                         </div>
-                        <div class="chart-row">
-                            <div class="chart-card">
-                                <h3>Hourly Activity</h3>
-                                <div style="position: relative; height: 300px; width: 100%;">
-                                    <canvas id="hourlyChart"></canvas>
+                        
+                        <div class="chart-row" style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <div class="chart-card" style="flex: 1; min-width: 300px; padding: 24px;">
+                                <h3 style="text-align: center; margin-bottom: 16px;">Messages per Person</h3>
+                                <div style="position: relative; height: 350px; width: 100%;">
+                                    <canvas id="donutChart"></canvas>
                                 </div>
                             </div>
-                            <div class="chart-card">
-                                <h3>Top Contributors</h3>
-                                <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; margin-bottom: 8px;">
-                                    <input type="date" id="dateFrom" class="date-filter">
-                                    <span style="color: var(--text-tertiary); font-size: 12px;">to</span>
-                                    <input type="date" id="dateTo" class="date-filter">
-                                    <button id="exportExcelBtn" class="btn ghost" title="Export to Excel" style="padding: 4px 6px;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                                    </button>
-                                </div>
-                                <div style="position: relative; height: 300px; width: 100%;">
-                                    <canvas id="statsChart"></canvas>
+                            <div class="chart-card" style="flex: 1; min-width: 300px; padding: 24px;">
+                                <h3 style="text-align: center; margin-bottom: 16px;">Time of Day</h3>
+                                <div style="position: relative; height: 350px; width: 100%;">
+                                    <canvas id="hourlyStackedChart"></canvas>
                                 </div>
                             </div>
                         </div>
-                        <div class="chart-row">
-                            <div class="chart-card">
-                                <h3>Media Types</h3>
-                                <div style="position: relative; height: 300px; width: 100%;">
-                                    <canvas id="mediaChart"></canvas>
+                        
+                        <div class="chart-row" style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <div class="chart-card" style="flex: 1; min-width: 300px; padding: 24px;">
+                                <h3 style="text-align: center; margin-bottom: 16px;">Month</h3>
+                                <div style="position: relative; height: 350px; width: 100%;">
+                                    <canvas id="monthRadarChart"></canvas>
                                 </div>
                             </div>
-                            <div class="chart-card">
-                                <h3>Top Emojis</h3>
-                                <div class="emoji-row" id="topEmojis" style="justify-content: center; height: 100%; align-items: center;"></div>
+                            <div class="chart-card" style="flex: 1; min-width: 300px; padding: 24px;">
+                                <h3 style="text-align: center; margin-bottom: 16px;">Weekday</h3>
+                                <div style="position: relative; height: 350px; width: 100%;">
+                                    <canvas id="weekdayRadarChart"></canvas>
+                                </div>
                             </div>
                         </div>
+                        
+                        <div class="participant-grid" id="participantCards" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 24px;">
+                            <!-- JS injected cards -->
+                        </div>
+                        
                         <div id="summaryText" style="display: none;"></div>
                     </div>
 

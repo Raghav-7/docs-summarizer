@@ -280,11 +280,17 @@ def parse_chat(text):
     parsed_messages = []
     stats = {}
     time_series = {}
-    hourly_activity = {str(i).zfill(2): 0 for i in range(24)}
+    hourly_activity = {str(i).zfill(2): {} for i in range(24)}
     media_stats = {'stickers': 0, 'gifs': 0, 'links': 0, 'media_omitted': 0}
     emoji_counts = {}
     shared_links = {}
     url_pattern = re.compile(r'(https?://[^\s]+)')
+    
+    user_stats = {}
+    monthly_activity = {str(i).zfill(2): {} for i in range(1, 13)}
+    weekday_activity = {str(i): {} for i in range(7)}
+    global_first_date = None
+    global_last_date = None
     
     # Regex handles Android and iOS WhatsApp exports
     pattern = re.compile(
@@ -295,21 +301,34 @@ def parse_chat(text):
         match = pattern.match(line)
         if match:
             date_str = match.group('date')
+            if sender not in user_stats:
+                user_stats[sender] = {'words': 0, 'unique_words': set(), 'longest': 0, 'emojis': {}}
+                
             try:
-                parts = date_str.split('/')
+                parts = re.split(r'[/.-]', date_str)
                 if len(parts) == 3:
                     year = parts[2]
-                    if len(year) == 2:
-                        year = "20" + year
-                    iso_date = f"{year}-{parts[0].zfill(2)}-{parts[1].zfill(2)}"
+                    if len(year) == 2: year = "20" + year
+                    p1, p2 = int(parts[0]), int(parts[1])
+                    if p1 > 12: m, d = p2, p1
+                    else: m, d = p1, p2
+                    dt = date(int(year), m, d)
+                    
+                    if global_first_date is None or dt < global_first_date: global_first_date = dt
+                    if global_last_date is None or dt > global_last_date: global_last_date = dt
+                    
+                    m_str = str(dt.month).zfill(2)
+                    w_str = str(dt.weekday())
+                    
+                    monthly_activity[m_str][sender] = monthly_activity[m_str].get(sender, 0) + 1
+                    weekday_activity[w_str][sender] = weekday_activity[w_str].get(sender, 0) + 1
+                    iso_date = f"{year}-{str(m).zfill(2)}-{str(d).zfill(2)}"
                 else:
                     iso_date = date_str
             except:
                 iso_date = date_str
-
+                
             time = match.group('time')
-            sender = match.group('sender').strip()
-            message = match.group('message')
             
             # Media detection
             lower_msg = message.lower()
@@ -325,6 +344,16 @@ def parse_chat(text):
             for e in emojis_in_msg:
                 emoji_char = e['emoji']
                 emoji_counts[emoji_char] = emoji_counts.get(emoji_char, 0) + 1
+                user_stats[sender]['emojis'][emoji_char] = user_stats[sender]['emojis'].get(emoji_char, 0) + 1
+                
+            # Words extraction
+            words = message.split()
+            word_count = len(words)
+            user_stats[sender]['words'] += word_count
+            if word_count > user_stats[sender]['longest']:
+                user_stats[sender]['longest'] = word_count
+            for w in words:
+                user_stats[sender]['unique_words'].add(w.lower())
                 
             # URL extraction
             urls = url_pattern.findall(message)
@@ -345,7 +374,7 @@ def parse_chat(text):
                     hour_str = '00'
                 hour_str = hour_str.zfill(2)
                 if hour_str in hourly_activity:
-                    hourly_activity[hour_str] += 1
+                    hourly_activity[hour_str][sender] = hourly_activity[hour_str].get(sender, 0) + 1
             except:
                 pass
             
@@ -367,7 +396,30 @@ def parse_chat(text):
     for url, data in sorted(shared_links.items(), key=lambda x: x[1]['count'], reverse=True)[:50]:
         sorted_links[url] = {'count': data['count'], 'senders': list(data['senders'])}
     
-    return '\n'.join(parsed_messages), sorted_stats, time_series, hourly_activity, media_stats, sorted_emojis, sorted_links
+    advanced_stats = {
+        'kpis': {
+            'first_date': global_first_date.isoformat() if global_first_date else None,
+            'last_date': global_last_date.isoformat() if global_last_date else None,
+            'days_chatted': (global_last_date - global_first_date).days + 1 if global_first_date and global_last_date else 0,
+            'total_messages': len(parsed_messages),
+            'people_count': len(stats)
+        },
+        'user_stats': {
+            s: {
+                'messages': stats[s],
+                'words': u['words'],
+                'unique_words': len(u['unique_words']),
+                'longest': u['longest'],
+                'avg_words': round(u['words'] / stats[s]) if stats[s] > 0 else 0,
+                'top_emojis': dict(sorted(u['emojis'].items(), key=lambda x: x[1], reverse=True)[:5])
+            }
+            for s, u in user_stats.items()
+        },
+        'monthly': monthly_activity,
+        'weekday': weekday_activity
+    }
+    
+    return '\n'.join(parsed_messages), sorted_stats, time_series, hourly_activity, media_stats, sorted_emojis, sorted_links, advanced_stats
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -452,7 +504,7 @@ def api_tool_stats(tool_name):
         if is_document:
             return jsonify({'is_document': True})
             
-        formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links = parse_chat(chat_text)
+        formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links, advanced_stats = parse_chat(chat_text)
         if not formatted_chat:
              return jsonify({'error': 'Could not parse any messages from the uploaded file.'}), 400
              
@@ -463,7 +515,8 @@ def api_tool_stats(tool_name):
             'hourly_activity': hourly_activity,
             'media': media_stats,
             'emojis': top_emojis,
-            'links': shared_links
+            'links': shared_links,
+            'advanced_stats': advanced_stats
         })
     except Exception as e:
         print(f"Stats Error: {e}")

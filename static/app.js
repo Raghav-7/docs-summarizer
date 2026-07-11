@@ -371,66 +371,148 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function renderAnalyticsDashboard(data) {
-        // 1. Populate KPIs
-        const totalMsgs = Object.values(data.stats || {}).reduce((a, b) => a + b, 0);
-        document.getElementById('kpiMessages').textContent = totalMsgs.toLocaleString();
+        if (!data.advanced_stats) return;
         
-        const mediaCount = (data.media?.stickers || 0) + (data.media?.gifs || 0) + (data.media?.media_omitted || 0) + (data.media?.links || 0);
-        document.getElementById('kpiMedia').textContent = mediaCount.toLocaleString();
+        const adv = data.advanced_stats;
         
-        const topUser = Object.keys(data.stats || {})[0] || '-';
-        document.getElementById('kpiTopUser').textContent = topUser;
+        // 1. Populate Advanced KPIs
+        document.getElementById('kpiFirstDate').textContent = adv.kpis.first_date || '-';
+        document.getElementById('kpiLastDate').textContent = adv.kpis.last_date || '-';
+        document.getElementById('kpiDays').textContent = adv.kpis.days_chatted.toLocaleString();
+        document.getElementById('kpiTotalMessages').textContent = adv.kpis.total_messages.toLocaleString();
+        document.getElementById('kpiPeople').textContent = adv.kpis.people_count.toLocaleString();
         
-        // 2. Timeline Chart (Line)
+        // Color palette for users
+        const colors = ['#0f766e', '#0d9488', '#14b8a6', '#5eead4', '#f59e0b', '#d97706', '#b45309', '#db2777', '#be185d', '#3b82f6'];
+        
+        const users = Object.keys(adv.user_stats);
+        const userColors = {};
+        users.forEach((u, i) => { userColors[u] = colors[i % colors.length]; });
+        
+        // 2. Timeline Chart (Messages per Day)
         const dailyCounts = {};
         if (data.time_series) {
-            for (const [date, users] of Object.entries(data.time_series)) {
-                dailyCounts[date] = Object.values(users).reduce((a, b) => a + b, 0);
+            for (const [date, u_counts] of Object.entries(data.time_series)) {
+                dailyCounts[date] = Object.values(u_counts).reduce((a, b) => a + b, 0);
             }
         }
         renderChart(dailyCounts, 'timelineChart', 'line');
         
-        // 3. Hourly Chart (Bar)
-        if (data.hourly_activity) {
-            renderChart(data.hourly_activity, 'hourlyChart', 'bar');
-        }
+        // Helper to destroy and init charts
+        const initChart = (id, config) => {
+            if (window[`${id}Instance`]) window[`${id}Instance`].destroy();
+            const ctx = document.getElementById(id);
+            if (ctx) window[`${id}Instance`] = new Chart(ctx, config);
+        };
         
-        // 4. Stats Chart (Bar - already handled via default render)
-        if (data.stats) {
-            renderChart(data.stats, 'statsChart', 'bar');
-        }
+        // 3. Donut Chart (Messages per Person)
+        initChart('donutChart', {
+            type: 'doughnut',
+            data: {
+                labels: users,
+                datasets: [{
+                    data: users.map(u => adv.user_stats[u].messages),
+                    backgroundColor: users.map(u => userColors[u]),
+                    borderWidth: 0
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
+        });
         
-        // 5. Media Chart (Doughnut)
-        if (data.media) {
-            const ctx = document.getElementById('mediaChart');
-            if (window.mediaChartInstance) window.mediaChartInstance.destroy();
-            window.mediaChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Stickers', 'GIFs', 'Links', 'Images/Videos'],
-                    datasets: [{
-                        data: [data.media.stickers, data.media.gifs, data.media.links, data.media.media_omitted],
-                        backgroundColor: ['#f59e0b', '#ec4899', '#3b82f6', '#10b981'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } },
-                    cutout: '70%'
-                }
-            });
-        }
+        // 4. Stacked Bar Chart (Time of Day)
+        const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
+        const hourlyDatasets = users.map(u => {
+            return {
+                label: u,
+                data: hours.map(h => (data.hourly_activity[h] && data.hourly_activity[h][u]) || 0),
+                backgroundColor: userColors[u]
+            };
+        });
         
-        // Render emojis
-        if (data.emojis) {
-            const emojiRow = document.getElementById('topEmojis');
-            emojiRow.innerHTML = '';
-            Object.entries(data.emojis).forEach(([emoji, count]) => {
-                emojiRow.innerHTML += `<div class="emoji-badge"><span class="emoji-char">${emoji}</span> <span class="emoji-count">${count}</span></div>`;
-            });
-        }
+        initChart('hourlyStackedChart', {
+            type: 'bar',
+            data: { labels: hours.map(h => h + ':00'), datasets: hourlyDatasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, border: { display: false } } }
+            }
+        });
+        
+        // 5. Radar Chart (Month)
+        const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthDatasets = users.map(u => {
+            return {
+                label: u,
+                data: months.map(m => (adv.monthly[m] && adv.monthly[m][u]) || 0),
+                borderColor: userColors[u],
+                backgroundColor: userColors[u] + '33', // 20% opacity
+                borderWidth: 2
+            };
+        });
+        
+        initChart('monthRadarChart', {
+            type: 'radar',
+            data: { labels: monthNames, datasets: monthDatasets },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { r: { ticks: { display: false } } } }
+        });
+        
+        // 6. Radar Chart (Weekday)
+        const weekdays = ['0', '1', '2', '3', '4', '5', '6'];
+        const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const weekdayDatasets = users.map(u => {
+            return {
+                label: u,
+                data: weekdays.map(d => (adv.weekday[d] && adv.weekday[d][u]) || 0),
+                borderColor: userColors[u],
+                backgroundColor: userColors[u] + '33', // 20% opacity
+                borderWidth: 2
+            };
+        });
+        
+        initChart('weekdayRadarChart', {
+            type: 'radar',
+            data: { labels: weekdayNames, datasets: weekdayDatasets },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { r: { ticks: { display: false } } } }
+        });
+        
+        // 7. Participant Cards
+        const cardsContainer = document.getElementById('participantCards');
+        cardsContainer.innerHTML = '';
+        users.forEach(u => {
+            const uData = adv.user_stats[u];
+            let emojisHtml = '';
+            for (const [emoji, count] of Object.entries(uData.top_emojis)) {
+                emojisHtml += `<span title="${count} times" style="font-size: 1.2rem; margin-right: 4px;">${emoji}</span>`;
+            }
+            if(!emojisHtml) emojisHtml = '<span style="color:var(--text-muted);">None</span>';
+            
+            cardsContainer.innerHTML += `
+                <div class="card" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); background: white;">
+                    <div style="background: ${userColors[u]}; padding: 16px 20px;">
+                        <h3 style="color: white; margin: 0; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">${u}</h3>
+                    </div>
+                    <div style="padding: 20px; color: var(--text-secondary); font-size: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+                            <span>Total words:</span> <strong style="color: var(--text-primary);">${uData.words.toLocaleString()}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; align-items: center;">
+                            <span>Most used emojis:</span> <div>${emojisHtml}</div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+                            <span>Longest message:</span> <strong style="color: var(--text-primary);">${uData.longest} words</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+                            <span>Wordstock (unique words):</span> <strong style="color: var(--text-primary);">${uData.unique_words.toLocaleString()}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Average words per message:</span> <strong style="color: var(--text-primary);">${uData.avg_words}</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
     }
     
     function renderChecklists(text) {
