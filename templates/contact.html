@@ -91,11 +91,7 @@
               {% endif %}
             {% endwith %}
 
-            <form action="https://api.web3forms.com/submit" method="POST">
-                <!-- Web3Forms Access Key: You will replace this with your actual key -->
-                <input type="hidden" name="access_key" value="YOUR_ACCESS_KEY_HERE">
-                <input type="hidden" name="subject" value="New Grievance from WhatsApp Summarizer">
-                <input type="hidden" name="redirect" value="{{ url_for('contact') }}">
+            <form action="{{ url_for('contact') }}" method="POST">
                 
                 <div class="form-group">
                     <label for="name">Your Name</label>

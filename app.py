@@ -23,6 +23,9 @@ TEMP_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'temp_uploads')
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 import emoji
 import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ─── Tool Registry ────────────────────────────────────────────────
 TOOLS = {
@@ -739,8 +742,48 @@ def chat():
             user_msg = "An unexpected error occurred. Please try again."
         return jsonify({'error': user_msg}), 500
 
-@app.route('/contact', methods=['GET'])
+@app.route('/contact', methods=['GET', 'POST'])
 def contact():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        user_email = request.form.get('email')
+        message_text = request.form.get('message')
+        
+        if not name or not user_email or not message_text:
+            flash('Please fill in all fields.', 'error')
+            return redirect(url_for('contact'))
+            
+        admin_email = "elisapanabaker@gmail.com"
+        app_password = os.getenv('GMAIL_APP_PASSWORD')
+        
+        if not app_password:
+            print("ERROR: GMAIL_APP_PASSWORD not set in environment!")
+            flash('Email service is not configured correctly on the server. Please contact support manually.', 'error')
+            return redirect(url_for('contact'))
+            
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = admin_email
+            msg['To'] = admin_email
+            msg['Reply-To'] = user_email
+            msg['Subject'] = f"New Grievance from {name} via WhatsApp Summarizer"
+            
+            body = f"Name: {name}\nEmail: {user_email}\n\nMessage:\n{message_text}"
+            msg.attach(MIMEText(body, 'plain'))
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(admin_email, app_password)
+            server.send_message(msg)
+            server.quit()
+            
+            flash('Your message has been sent successfully! We will get back to you soon.', 'success')
+        except Exception as e:
+            print(f"SMTP Error: {str(e)}")
+            flash('There was an error sending your message. Please try again later.', 'error')
+            
+        return redirect(url_for('contact'))
+        
     return render_template('contact.html')
 
 @app.route('/api/export-pdf', methods=['POST'])
