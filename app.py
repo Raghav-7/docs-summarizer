@@ -301,6 +301,10 @@ def parse_chat(text):
         match = pattern.match(line)
         if match:
             date_str = match.group('date')
+            time = match.group('time')
+            sender = match.group('sender').strip()
+            message = match.group('message')
+            
             if sender not in user_stats:
                 user_stats[sender] = {'words': 0, 'unique_words': set(), 'longest': 0, 'emojis': {}}
                 
