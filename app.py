@@ -234,14 +234,6 @@ class Usage(db.Model):
     use_date = db.Column(db.Date, default=date.today)
     count = db.Column(db.Integer, default=0)
 
-class ContactMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(255))
-    message = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    read = db.Column(db.Boolean, default=False)
-
 # Create tables
 with app.app_context():
     db.create_all()
@@ -747,24 +739,8 @@ def chat():
             user_msg = "An unexpected error occurred. Please try again."
         return jsonify({'error': user_msg}), 500
 
-@app.route('/contact', methods=['GET', 'POST'])
+@app.route('/contact', methods=['GET'])
 def contact():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        message_text = request.form.get('message')
-        
-        if not name or not email or not message_text:
-            flash('Please fill in all fields.', 'error')
-            return redirect(url_for('contact'))
-            
-        new_msg = ContactMessage(name=name, email=email, message=message_text)
-        db.session.add(new_msg)
-        db.session.commit()
-        
-        flash('Your message has been sent successfully! We will get back to you soon.', 'success')
-        return redirect(url_for('contact'))
-        
     return render_template('contact.html')
 
 @app.route('/api/export-pdf', methods=['POST'])
