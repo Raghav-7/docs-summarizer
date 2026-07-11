@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tool.title }} — DocuChat</title>
+    <meta name="description" content="{{ tool.long_description }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>:root { --tool-color: {{ tool.color }}; }</style>
+</head>
+<body>
+    <div class="app-shell">
+        <nav class="topbar">
+            <a href="/" class="topbar-brand">
+                <div class="topbar-logo">D</div>
+                <span class="topbar-title">DocuChat</span>
+            </a>
+            <div class="topbar-actions">
+                <a href="/" class="btn ghost">All Tools</a>
+                {% if session.get('logged_in') %}
+                    <a href="{{ url_for('history') }}" class="btn ghost">History</a>
+                    <a href="{{ url_for('logout') }}" class="btn ghost">Logout</a>
+                {% endif %}
+            </div>
+        </nav>
+
+        <main class="container">
+            <!-- Tool Header -->
+            <div class="tool-page-header" style="--tool-color: {{ tool.color }};">
+                <div class="tool-page-icon" style="background: {{ tool.color }}10; color: {{ tool.color }};">
+                    {% if tool.icon == 'summarize' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    {% elif tool.icon == 'action' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    {% elif tool.icon == 'stats' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    {% elif tool.icon == 'sentiment' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                    {% elif tool.icon == 'search' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    {% elif tool.icon == 'export' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    {% endif %}
+                </div>
+                <h1>{{ tool.title }}</h1>
+                <p>{{ tool.long_description }}</p>
+            </div>
+            
+            <div class="ad-banner" style="margin-bottom: 24px;">Advertisement</div>
+
+            <!-- Usage Limit Banner -->
+            {% if remaining is defined and remaining <= 1 and not session.get('logged_in') %}
+            <div class="limit-banner">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                {% if remaining == 0 %}
+                    You've used all {{ limit }} free analyses for today. Come back tomorrow!
+                {% else %}
+                    Last free analysis for today — make it count!
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Upload Section -->
+            <section class="card upload-card" id="uploadSection">
+                <div class="tabs">
+                    <button class="tab-btn active" id="tabUploadBtn">Upload File</button>
+                    <button class="tab-btn" id="tabPasteBtn">Paste Text</button>
+                </div>
+
+                <div id="tabUpload" class="tab-content active-tab">
+                    <div class="drop-zone" id="dropZone">
+                        <div class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        </div>
+                        <h3>Drop your file here</h3>
+                        <p>Supports {{ tool.accepts }}</p>
+                        <input type="file" id="fileInput" accept="{{ tool.accepts }}" hidden>
+                    </div>
+                </div>
+
+                <div id="tabPaste" class="tab-content">
+                    <textarea id="pasteInput" placeholder="Paste your WhatsApp chat text here..."></textarea>
+                </div>
+
+                <div class="action-bar">
+                    <div class="usage-indicator">
+                        <span class="usage-dot" style="background: {{ 'var(--success)' if remaining > 1 else 'var(--warning)' if remaining == 1 else 'var(--error)' }};"></span>
+                        <span style="font-size: 12px; color: var(--text-tertiary);">{{ remaining }} uses left today</span>
+                    </div>
+                    <button id="summarizeBtn" class="btn primary" style="background: {{ tool.color }};" disabled>
+                        Analyze
+                    </button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="card hidden" id="resultSection" style="padding: 32px; max-width: 100%;">
+                <div class="loading-state hidden" id="loadingState">
+                    <div class="spinner" style="border-top-color: {{ tool.color }};"></div>
+                    <p>Analyzing your document…</p>
+                    <div class="progress-container">
+                        <div class="progress-fill" id="progressFill" style="background: {{ tool.color }};"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">0%</p>
+                </div>
+
+                <div class="summary-content hidden" id="summaryContent">
+                    <div class="results-header">
+                        <h2>Results</h2>
+                        <div class="export-actions">
+                            <button class="btn secondary" id="exportPdfBtn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                PDF
+                            </button>
+                            <button class="btn secondary" id="resetBtn">New Analysis</button>
+                        </div>
+                    </div>
+                    
+                    <div class="ad-banner" style="margin-bottom: 24px;">Advertisement</div>
+
+                    {% if tool_name == 'statistics' %}
+                    <!-- Layout B: Power BI Analytics -->
+                    <div class="analytics-dashboard-grid" id="analyticsGrid" style="display: none;">
+                        <div class="kpi-row">
+                            <div class="kpi-card"><h3>Total Messages</h3><div id="kpiMessages" class="kpi-value">0</div></div>
+                            <div class="kpi-card"><h3>Media & Links</h3><div id="kpiMedia" class="kpi-value">0</div></div>
+                            <div class="kpi-card"><h3>Most Active</h3><div id="kpiTopUser" class="kpi-value">-</div></div>
+                        </div>
+                        <div class="chart-row">
+                            <div class="chart-card full-width">
+                                <h3>Messages Over Time</h3>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="timelineChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-row">
+                            <div class="chart-card">
+                                <h3>Hourly Activity</h3>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="hourlyChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card">
+                                <h3>Top Contributors</h3>
+                                <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end; margin-bottom: 8px;">
+                                    <input type="date" id="dateFrom" class="date-filter">
+                                    <span style="color: var(--text-tertiary); font-size: 12px;">to</span>
+                                    <input type="date" id="dateTo" class="date-filter">
+                                    <button id="exportExcelBtn" class="btn ghost" title="Export to Excel" style="padding: 4px 6px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                    </button>
+                                </div>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="statsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-row">
+                            <div class="chart-card">
+                                <h3>Media Types</h3>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="mediaChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card">
+                                <h3>Top Emojis</h3>
+                                <div class="emoji-row" id="topEmojis" style="justify-content: center; height: 100%; align-items: center;"></div>
+                            </div>
+                        </div>
+                        <div id="summaryText" style="display: none;"></div>
+                    </div>
+
+                    {% elif tool_name == 'search' %}
+                    <!-- Layout C: Focus Mode (Search) -->
+                    <div class="focus-chat-layout" id="focusChatLayout">
+                        <div id="summaryText" style="display: none;"></div>
+                        <div class="chat-widget expanded" id="chatWidget">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3>Ask questions about this chat</h3>
+                                <button id="exportChatPdfBtn" class="btn ghost" title="Export chat">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                </button>
+                            </div>
+                            <div class="chat-history" id="chatHistory" style="height: 400px;">
+                                <div class="chat-message ai-message">Document analyzed. Ask me anything!</div>
+                            </div>
+                            <div class="chat-chips" id="chatChips" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;">
+                                <button class="chat-chip">📅 Summarize by date</button>
+                                <button class="chat-chip">📌 List key decisions</button>
+                                <button class="chat-chip">👥 Who was most active?</button>
+                            </div>
+                            <div class="chat-input-container">
+                                <input type="text" id="chatInput" placeholder="e.g., What did John say about the project?" autocomplete="off">
+                                <button id="sendChatBtn" class="btn primary" style="background: {{ tool.color }};">Ask</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% else %}
+                    <!-- Layout A: Default Layout -->
+                    <div class="dashboard">
+                        <div class="dashboard-col" id="pdfCaptureArea">
+                            <h2>{{ tool.title }}</h2>
+                            <div id="summaryText" class="markdown-body"></div>
+                        </div>
+                        
+                        <div class="dashboard-col {% if not tool.show_stats and not tool.show_profiles %}hidden{% endif %}" id="statsColumn">
+                            <div class="{% if not tool.show_stats %}hidden{% endif %}" style="border-radius: 8px; border: 1px solid var(--border); padding: 20px; background: var(--surface);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                                    <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Messages per user</h3>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <input type="date" id="dateFrom" class="date-filter">
+                                        <span style="color: var(--text-tertiary); font-size: 12px;">to</span>
+                                        <input type="date" id="dateTo" class="date-filter">
+                                        <button id="exportExcelBtn" class="btn ghost" title="Export to Excel" style="padding: 4px 6px;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div style="position: relative; height: 300px; width: 100%;">
+                                    <canvas id="statsChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div id="profilesContainer" class="{% if not tool.show_profiles %}hidden{% endif %}">
+                                <h3>Personality Profiles</h3>
+                                <div class="markdown-body" id="profilesText"></div>
+                            </div>
+
+                            <div id="mediaStatsContainer" class="media-stats hidden">
+                                <h3>Fun Facts</h3>
+                                <div class="stats-grid">
+                                    <div class="stat-card">
+                                        <span class="stat-value" id="stickerCount">0</span>
+                                        <span class="stat-label">Stickers</span>
+                                    </div>
+                                    <div class="stat-card">
+                                        <span class="stat-value" id="gifCount">0</span>
+                                        <span class="stat-label">GIFs</span>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <h4 style="font-size: 12px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin-bottom: 8px;">Top Emojis</h4>
+                                    <div class="emoji-row" id="topEmojis"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Follow up chat for Default Layout -->
+                    <div class="chat-widget hidden" id="chatWidget">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>Follow-up Q&A</h3>
+                            <div style="display: flex; gap: 4px;">
+                                <button id="exportChatPdfBtn" class="btn ghost" title="Export chat">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                </button>
+                                <button id="expandChatBtn" class="btn ghost" title="Expand">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="chat-history" id="chatHistory">
+                            <div class="chat-message ai-message">Ready to answer questions about your document.</div>
+                        </div>
+                        <div class="chat-input-container">
+                            <input type="text" id="chatInput" placeholder="Ask a question…" autocomplete="off">
+                            <button id="sendChatBtn" class="btn primary" style="background: {{ tool.color }};">Send</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 DocuChat. <a href="/">All Tools</a>
+            {% if not session.get('logged_in') %}
+                · <a href="{{ url_for('login') }}">Admin</a>
+            {% endif %}
+            </p>
+        </footer>
+    </div>
+
+    <!-- Pass tool config to JS -->
+    <script>
+        window.TOOL_CONFIG = {
+            name: "{{ tool_name }}",
+            apiEndpoint: "/api/tool/{{ tool_name }}",
+            showStats: {{ 'true' if tool.show_stats else 'false' }},
+            showProfiles: {{ 'true' if tool.show_profiles else 'false' }},
+            color: "{{ tool.color }}"
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

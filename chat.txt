@@ -1,0 +1,5 @@
+14/08/23, 10:20 - John Doe: Hey guys, are we still on for the meeting tomorrow?
+14/08/23, 10:25 - Jane Smith: Yes! I'll prepare the slides.
+[14/08/23, 10:26:15] Bob: I might be 5 minutes late, please start without me.
+14/08/23, 10:30 - John Doe: Sounds good. Jane, can you make sure to include the Q2 metrics?
+14/08/23, 10:32 - Jane Smith: Will do. See you all tomorrow!

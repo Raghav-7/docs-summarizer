@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuChat — AI-Powered Chat & Document Analysis</title>
+    <meta name="description" content="Every tool you need to analyze WhatsApp chats and documents. Summarize, extract action items, track sentiment, get statistics, and more.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-shell">
+        <nav class="topbar">
+            <a href="/" class="topbar-brand">
+                <div class="topbar-logo">D</div>
+                <span class="topbar-title">DocuChat</span>
+            </a>
+            <div class="topbar-actions">
+                {% if session.get('logged_in') %}
+                    <a href="{{ url_for('history') }}" class="btn ghost">History</a>
+                    <a href="{{ url_for('logout') }}" class="btn ghost">Logout</a>
+                {% endif %}
+            </div>
+        </nav>
+
+        <main>
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="hero-inner">
+                    <h1>Every tool you need to<br>analyze WhatsApp chats</h1>
+                    <p>Summarize conversations, extract action items, track sentiment, get statistics — all powered by AI. Free to use.</p>
+                    {% if remaining is defined and remaining < limit %}
+                    <div class="usage-pill">
+                        <span class="usage-dot"></span>
+                        {{ remaining }} of {{ limit }} free uses remaining today
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- Tool Grid -->
+            <section class="tool-grid-section">
+                <div class="tool-grid">
+                    {% for key, tool in tools.items() %}
+                    <a href="/tool/{{ key }}" class="tool-card" style="--tool-color: {{ tool.color }};">
+                        <div class="tool-card-icon">
+                            {% if tool.icon == 'summarize' %}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            {% elif tool.icon == 'action' %}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            {% elif tool.icon == 'stats' %}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                            {% elif tool.icon == 'sentiment' %}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                            {% elif tool.icon == 'search' %}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            {% elif tool.icon == 'export' %}
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            {% endif %}
+                        </div>
+                        <h3 class="tool-card-title">{{ tool.title }}</h3>
+                        <p class="tool-card-desc">{{ tool.description }}</p>
+                    </a>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- How It Works -->
+            <section class="how-section">
+                <h2>How it works</h2>
+                <div class="steps-row">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h3>Export your chat</h3>
+                        <p>Open WhatsApp → Group Info → Export Chat. Save the .txt or .zip file.</p>
+                    </div>
+                    <div class="step-connector">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h3>Pick a tool & upload</h3>
+                        <p>Choose the analysis you need — summarize, statistics, sentiment, and more.</p>
+                    </div>
+                    <div class="step-connector">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h3>Get instant results</h3>
+                        <p>AI analyzes your chat in seconds. Export, share, or ask follow-up questions.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 DocuChat. Free to use — {{ limit }} analyses per day.
+            {% if not session.get('logged_in') %}
+                · <a href="{{ url_for('login') }}">Admin</a>
+            {% endif %}
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

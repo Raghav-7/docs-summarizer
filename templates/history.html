@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin History - DocuChat AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .history-card {
+            background: #ffffff;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .history-meta {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header style="position: relative; margin-bottom: 32px;">
+            <div style="position: absolute; top: 0; right: 0; display: flex; gap: 8px;">
+                <a href="{{ url_for('index') }}" class="btn secondary" style="padding: 6px 12px; font-size: 0.8rem;">Back to App</a>
+                <a href="{{ url_for('logout') }}" class="btn secondary" style="padding: 6px 12px; font-size: 0.8rem;">Logout</a>
+            </div>
+            <h1>Admin Database History</h1>
+            <p>These summaries were saved securely to your local database.</p>
+        </header>
+
+        {% if summaries %}
+            {% for summary in summaries %}
+            <div class="history-card">
+                <div class="history-meta">
+                    <strong>File: {{ summary.filename }}</strong>
+                    <span>{{ summary.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                </div>
+                <div class="markdown-body" id="content-{{ summary.id }}">
+                    {{ summary.content }}
+                </div>
+                <!-- Render markdown on the fly -->
+                <script>
+                    document.getElementById('content-{{ summary.id }}').innerHTML = marked.parse(document.getElementById('content-{{ summary.id }}').innerText);
+                </script>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="history-card" style="text-align: center; color: var(--text-muted);">
+                <p>No history found in the database.</p>
+            </div>
+        {% endif %}
+    </main>
+</body>
+</html>

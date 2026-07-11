@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuChat — AI Chat Analyzer</title>
+    <meta name="description" content="Upload your WhatsApp export or any document and get instant AI-powered summaries, analytics, and follow-up Q&A.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Top Navigation Bar -->
+        <nav class="topbar">
+            <a href="/" class="topbar-brand">
+                <div class="topbar-logo">D</div>
+                <span class="topbar-title">DocuChat</span>
+            </a>
+            <div class="topbar-actions">
+                {% if session.get('logged_in') %}
+                    <a href="{{ url_for('history') }}" class="btn ghost">History</a>
+                    <a href="{{ url_for('logout') }}" class="btn ghost">Logout</a>
+                {% endif %}
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="container">
+            <div class="page-header">
+                <h1>Analyze any conversation</h1>
+                <p>Upload a WhatsApp export or document to get an AI-powered summary, analytics dashboard, and interactive Q&A.</p>
+            </div>
+            
+            <div class="ad-banner" style="margin-bottom: 24px;">Advertisement</div>
+
+            <!-- Upload Section -->
+            <section class="card upload-card" id="uploadSection">
+                <div class="tabs">
+                    <button class="tab-btn active" id="tabUploadBtn">Upload File</button>
+                    <button class="tab-btn" id="tabPasteBtn">Paste Text</button>
+                </div>
+
+                <div id="tabUpload" class="tab-content active-tab">
+                    <div class="drop-zone" id="dropZone">
+                        <div class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        </div>
+                        <h3>Drop your file here</h3>
+                        <p>Supports .txt, .zip, and .pdf</p>
+                        <input type="file" id="fileInput" accept=".txt,.zip,.pdf" hidden>
+                    </div>
+                </div>
+
+                <div id="tabPaste" class="tab-content">
+                    <textarea id="pasteInput" placeholder="Paste your WhatsApp chat text here..."></textarea>
+                </div>
+
+                <div class="action-bar">
+                    <select id="summaryType">
+                        <option value="general">General Overview</option>
+                        <option value="date-wise">Date-wise Breakdown</option>
+                        <option value="action">Action Items & Decisions</option>
+                    </select>
+                    <button id="summarizeBtn" class="btn primary" disabled>Analyze</button>
+                </div>
+
+                <div class="instructions">
+                    <h4>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        How to export your chat
+                    </h4>
+                    <ol>
+                        <li>WhatsApp: Open the group → Group Info → Export Chat → select .txt or .zip</li>
+                        <li>Documents: Upload any .pdf for universal analysis</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="card hidden" id="resultSection" style="padding: 32px; max-width: 100%;">
+                <div class="loading-state hidden" id="loadingState">
+                    <div class="spinner"></div>
+                    <p>Analyzing your document…</p>
+                    <div class="progress-container">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">0%</p>
+                </div>
+
+                <div class="summary-content hidden" id="summaryContent">
+                    <div class="results-header">
+                        <h2>Results</h2>
+                        <div class="export-actions">
+                            <button class="btn secondary" id="exportPdfBtn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                                PDF
+                            </button>
+                            <button class="btn secondary" id="resetBtn">New Analysis</button>
+                        </div>
+                    </div>
+                    
+                    <div class="ad-banner" style="margin-bottom: 24px;">Advertisement</div>
+
+                    <div class="dashboard">
+                        <div class="dashboard-col" id="pdfCaptureArea">
+                            <h2>Summary</h2>
+                            <div id="summaryText" class="markdown-body"></div>
+                        </div>
+                        <div class="dashboard-col">
+                            <div style="border-radius: 8px; border: 1px solid var(--border); padding: 20px; background: var(--surface);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                                    <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Messages per user</h3>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <input type="date" id="dateFrom" class="date-filter">
+                                        <span style="color: var(--text-tertiary); font-size: 12px;">to</span>
+                                        <input type="date" id="dateTo" class="date-filter">
+                                        <button id="exportExcelBtn" class="btn ghost" title="Export to Excel" style="padding: 4px 6px;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <canvas id="statsChart"></canvas>
+                            </div>
+
+                            <div id="profilesContainer" class="hidden">
+                                <h3>Personality Profiles</h3>
+                                <div class="markdown-body" id="profilesText"></div>
+                            </div>
+
+                            <div id="mediaStatsContainer" class="media-stats hidden">
+                                <h3>Fun Facts</h3>
+                                <div class="stats-grid">
+                                    <div class="stat-card">
+                                        <span class="stat-value" id="stickerCount">0</span>
+                                        <span class="stat-label">Stickers</span>
+                                    </div>
+                                    <div class="stat-card">
+                                        <span class="stat-value" id="gifCount">0</span>
+                                        <span class="stat-label">GIFs</span>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <h4 style="font-size: 12px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin-bottom: 8px;">Top Emojis</h4>
+                                    <div class="emoji-row" id="topEmojis"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Widget -->
+                    <div class="chat-widget hidden" id="chatWidget">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>Follow-up Q&A</h3>
+                            <div style="display: flex; gap: 4px;">
+                                <button id="exportChatPdfBtn" class="btn ghost" title="Export chat">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                </button>
+                                <button id="expandChatBtn" class="btn ghost" title="Expand">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="chat-history" id="chatHistory">
+                            <div class="chat-message ai-message">Ready to answer questions about your document.</div>
+                        </div>
+                        <div class="chat-chips" id="chatChips" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;">
+                            <button class="chat-chip">📅 Date-wise breakdown</button>
+                            <button class="chat-chip">✅ List action items</button>
+                            <button class="chat-chip">📌 Key decisions</button>
+                        </div>
+                        <div class="chat-input-container">
+                            <input type="text" id="chatInput" placeholder="Ask a question…" autocomplete="off">
+                            <button id="sendChatBtn" class="btn primary">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="site-footer">
+            <p>&copy; 2026 DocuChat.
+            {% if not session.get('logged_in') %}
+                <a href="{{ url_for('login') }}">Admin</a>
+            {% endif %}
+            </p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,689 @@
+document.addEventListener('DOMContentLoaded', () => {
+    // Tabs
+    const tabUploadBtn = document.getElementById('tabUploadBtn');
+    const tabPasteBtn = document.getElementById('tabPasteBtn');
+    const tabUpload = document.getElementById('tabUpload');
+    const tabPaste = document.getElementById('tabPaste');
+    
+    // File Upload Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    
+    // Paste Elements
+    const pasteInput = document.getElementById('pasteInput');
+    
+    // Action Elements
+    const summarizeBtn = document.getElementById('summarizeBtn');
+    const uploadSection = document.getElementById('uploadSection');
+    const resultSection = document.getElementById('resultSection');
+    const loadingState = document.getElementById('loadingState');
+    const summaryContent = document.getElementById('summaryContent');
+    const summaryText = document.getElementById('summaryText');
+    const resetBtn = document.getElementById('resetBtn');
+    const statsChartCtx = document.getElementById('statsChart');
+    const mediaStatsContainer = document.getElementById('mediaStatsContainer');
+    const stickerCount = document.getElementById('stickerCount');
+    const gifCount = document.getElementById('gifCount');
+    const topEmojis = document.getElementById('topEmojis');
+    
+    // New Elements
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const pdfCaptureArea = document.getElementById('pdfCaptureArea');
+    
+    // Chat Widget
+    const chatWidget = document.getElementById('chatWidget');
+    const chatHistory = document.getElementById('chatHistory');
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    const profilesContainer = document.getElementById('profilesContainer');
+    const profilesText = document.getElementById('profilesText');
+    const exportChatPdfBtn = document.getElementById('exportChatPdfBtn');
+    const expandChatBtn = document.getElementById('expandChatBtn');
+    let currentChatId = null;
+
+    let currentFile = null;
+    let chartInstance = null;
+    let activeMode = 'upload'; // 'upload' or 'paste'
+    let loaderInterval = null;
+    
+    // Global data for exports
+    let globalStats = null;
+    let globalFilteredStats = null;
+    let globalTimeSeries = null;
+    let globalMediaStats = null;
+    let globalEmojis = null;
+    let globalLinks = null;
+
+    // Tab Switching Logic
+    tabUploadBtn.addEventListener('click', () => {
+        activeMode = 'upload';
+        tabUploadBtn.classList.add('active');
+        tabPasteBtn.classList.remove('active');
+        tabUpload.classList.add('active-tab');
+        tabPaste.classList.remove('active-tab');
+        validateInput();
+    });
+
+    tabPasteBtn.addEventListener('click', () => {
+        activeMode = 'paste';
+        tabPasteBtn.classList.add('active');
+        tabUploadBtn.classList.remove('active');
+        tabPaste.classList.add('active-tab');
+        tabUpload.classList.remove('active-tab');
+        validateInput();
+    });
+
+    // File Drag and Drop Handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) {
+            handleFile(e.target.files[0]);
+        }
+    });
+    
+    pasteInput.addEventListener('input', () => {
+        validateInput();
+    });
+
+    function validateInput() {
+        if (activeMode === 'upload') {
+            summarizeBtn.disabled = !currentFile;
+        } else {
+            summarizeBtn.disabled = pasteInput.value.trim().length === 0;
+        }
+    }
+
+    // Handle the uploaded text file or zip file
+    function handleFile(file) {
+        const validTypes = ['text/plain', 'application/zip', 'application/x-zip-compressed', 'application/pdf'];
+        const validExts = ['.txt', '.zip', '.pdf'];
+        const isValid = validTypes.includes(file.type) || validExts.some(ext => file.name.toLowerCase().endsWith(ext));
+        
+        if (!isValid) {
+            alert('Please upload a .txt, .zip, or .pdf file');
+            return;
+        }
+
+        if (file.size > 100 * 1024 * 1024) {
+            alert('File exceeds the 100MB maximum limit.');
+            return;
+        }
+
+        currentFile = file;
+        dropZone.querySelector('h3').textContent = file.name;
+        dropZone.querySelector('p').textContent = 'File ready to process';
+        validateInput();
+    }
+
+    // Call Backend API
+    summarizeBtn.addEventListener('click', async () => {
+        // Transition UI
+        uploadSection.classList.add('hidden');
+        resultSection.classList.remove('hidden');
+        loadingState.classList.remove('hidden');
+        summaryContent.classList.add('hidden');
+        
+        // Progress Loader Logic
+        let progress = 0;
+        progressFill.style.width = '0%';
+        progressText.textContent = '0%';
+        
+        if (loaderInterval) clearInterval(loaderInterval);
+        loaderInterval = setInterval(() => {
+            if (progress < 30) {
+                progress += 5; // Fast initial upload
+            } else if (progress < 90) {
+                progress += 1; // Slow AI processing
+            }
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `${progress}%`;
+        }, 300);
+
+        const formData = new FormData();
+        const summaryTypeSelect = document.getElementById('summaryType');
+        if (summaryTypeSelect) {
+            formData.append('summary_type', summaryTypeSelect.value);
+        }
+        
+        if (activeMode === 'upload') {
+            formData.append('file', currentFile);
+        } else {
+            formData.append('raw_text', pasteInput.value);
+        }
+
+        try {
+            // Use dynamic tool endpoint if available, else fallback
+            const apiUrl = (window.TOOL_CONFIG && window.TOOL_CONFIG.apiEndpoint) || '/api/summarize';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Server Error');
+            }
+            
+            // Finish loader
+            clearInterval(loaderInterval);
+            progressFill.style.width = '100%';
+            progressText.textContent = '100%';
+            
+            // Store globally for exports
+            globalStats = data.stats;
+            globalTimeSeries = data.time_series;
+            globalFilteredStats = data.stats;
+            globalMediaStats = data.media;
+            globalEmojis = data.emojis;
+            globalLinks = data.links;
+            currentChatId = data.chat_id;
+
+            setTimeout(() => {
+                const toolName = window.TOOL_CONFIG ? window.TOOL_CONFIG.name : 'summarize';
+                
+                if (toolName === 'statistics') {
+                    // Render Power BI Analytics Dashboard
+                    document.getElementById('analyticsGrid').style.display = 'flex';
+                    renderAnalyticsDashboard(data);
+                } else if (toolName === 'search') {
+                    // Render Focus Mode Chat
+                    document.getElementById('focusChatLayout').style.display = 'flex';
+                    document.getElementById('chatWidget').classList.remove('hidden');
+                } else {
+                    // Default Layout (Summarize, Action Items, Sentiment, Export)
+                    const dashboardEl = document.querySelector('.dashboard');
+                    if(dashboardEl) dashboardEl.style.display = 'flex';
+                    document.getElementById('chatWidget').classList.remove('hidden');
+                    
+                    // Render markdown using marked
+                    if (toolName === 'action-items') {
+                        // Special rendering for action items
+                        summaryText.innerHTML = renderChecklists(data.response || "No action items found.");
+                    } else {
+                        summaryText.innerHTML = marked.parse(data.response || "No summary generated.");
+                    }
+                    
+                    if (data.profiles) {
+                        profilesText.innerHTML = marked.parse(data.profiles);
+                        profilesContainer.classList.remove('hidden');
+                    } else {
+                        profilesContainer.classList.add('hidden');
+                    }
+                    
+                    // Toggle visibility of stats column based on tool config and data
+                    const statsCol = document.getElementById('statsColumn');
+                    const toolShowsStats = window.TOOL_CONFIG ? window.TOOL_CONFIG.showStats : true;
+                    if (data.is_document || !toolShowsStats || !data.stats || Object.keys(data.stats).length === 0) {
+                        if (statsCol) statsCol.classList.add('hidden');
+                        if(exportExcelBtn) exportExcelBtn.classList.add('hidden');
+                    } else {
+                        if (statsCol) statsCol.classList.remove('hidden');
+                        if(exportExcelBtn) exportExcelBtn.classList.remove('hidden');
+                        // Render Chart if stats exist
+                        if (data.time_series && Object.keys(data.time_series).length > 0) {
+                            const dates = Object.keys(data.time_series).sort();
+                            if (dates.length > 0) {
+                                dateFrom.value = dates[0];
+                                dateTo.value = dates[dates.length - 1];
+                                dateFrom.min = dates[0];
+                                dateFrom.max = dates[dates.length - 1];
+                                dateTo.min = dates[0];
+                                dateTo.max = dates[dates.length - 1];
+                            }
+                            updateChartFromDates();
+                        } else if (data.stats && Object.keys(data.stats).length > 0) {
+                            renderChart(data.stats);
+                        }
+                        // Render Media Stats if exist
+                        if (data.media || data.emojis) {
+                            renderMediaStats(data.media, data.emojis);
+                        }
+                    }
+                }
+                
+                loadingState.classList.add('hidden');
+                const sumCont = document.getElementById('summaryContent');
+                if(sumCont) sumCont.classList.remove('hidden');
+            }, 500);
+
+        } catch (error) {
+            clearInterval(loaderInterval);
+            alert('Error: ' + error.message);
+            resetUI();
+        }
+    });
+    
+    function updateChartFromDates() {
+        if (!globalTimeSeries) return;
+        const fromD = dateFrom.value;
+        const toD = dateTo.value;
+        
+        let newStats = {};
+        for (const [date, users] of Object.entries(globalTimeSeries)) {
+            if (date >= fromD && date <= toD) {
+                for (const [user, count] of Object.entries(users)) {
+                    newStats[user] = (newStats[user] || 0) + count;
+                }
+            }
+        }
+        
+        // Sort
+        const sortedArray = Object.entries(newStats).sort((a, b) => b[1] - a[1]);
+        globalFilteredStats = Object.fromEntries(sortedArray);
+        renderChart(globalFilteredStats);
+    }
+    
+    if (dateFrom) dateFrom.addEventListener('change', updateChartFromDates);
+    if (dateTo) dateTo.addEventListener('change', updateChartFromDates);
+
+    function renderChart(statsData, canvasId = 'statsChart', chartType = 'bar') {
+        const entries = Object.entries(statsData).slice(0, 10);
+        const labels = entries.map(e => e[0]);
+        const data = entries.map(e => e[1]);
+        
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return null;
+        
+        // Destroy existing chart on this canvas if any
+        if (window[`${canvasId}Instance`]) {
+            window[`${canvasId}Instance`].destroy();
+        }
+        
+        const config = {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Messages',
+                    data: data,
+                    backgroundColor: window.TOOL_CONFIG ? window.TOOL_CONFIG.color : '#4f46e5',
+                    borderRadius: chartType === 'bar' ? 4 : 0,
+                    maxBarThickness: 40,
+                    borderColor: chartType === 'line' ? (window.TOOL_CONFIG ? window.TOOL_CONFIG.color : '#4f46e5') : undefined,
+                    tension: 0.3,
+                    fill: chartType === 'line' ? {target: 'origin', above: 'rgba(79, 70, 229, 0.1)'} : false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: chartType !== 'doughnut' ? {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: '#f3f4f6' },
+                        ticks: { color: '#6b7280', font: { size: 11 } },
+                        border: { display: false }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#6b7280', font: { size: 11 } },
+                        border: { display: false }
+                    }
+                } : {}
+            }
+        };
+        
+        window[`${canvasId}Instance`] = new Chart(ctx, config);
+        return window[`${canvasId}Instance`];
+    }
+    
+    function renderAnalyticsDashboard(data) {
+        // 1. Populate KPIs
+        const totalMsgs = Object.values(data.stats || {}).reduce((a, b) => a + b, 0);
+        document.getElementById('kpiMessages').textContent = totalMsgs.toLocaleString();
+        
+        const mediaCount = (data.media?.stickers || 0) + (data.media?.gifs || 0) + (data.media?.media_omitted || 0) + (data.media?.links || 0);
+        document.getElementById('kpiMedia').textContent = mediaCount.toLocaleString();
+        
+        const topUser = Object.keys(data.stats || {})[0] || '-';
+        document.getElementById('kpiTopUser').textContent = topUser;
+        
+        // 2. Timeline Chart (Line)
+        const dailyCounts = {};
+        if (data.time_series) {
+            for (const [date, users] of Object.entries(data.time_series)) {
+                dailyCounts[date] = Object.values(users).reduce((a, b) => a + b, 0);
+            }
+        }
+        renderChart(dailyCounts, 'timelineChart', 'line');
+        
+        // 3. Hourly Chart (Bar)
+        if (data.hourly_activity) {
+            renderChart(data.hourly_activity, 'hourlyChart', 'bar');
+        }
+        
+        // 4. Stats Chart (Bar - already handled via default render)
+        if (data.stats) {
+            renderChart(data.stats, 'statsChart', 'bar');
+        }
+        
+        // 5. Media Chart (Doughnut)
+        if (data.media) {
+            const ctx = document.getElementById('mediaChart');
+            if (window.mediaChartInstance) window.mediaChartInstance.destroy();
+            window.mediaChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Stickers', 'GIFs', 'Links', 'Images/Videos'],
+                    datasets: [{
+                        data: [data.media.stickers, data.media.gifs, data.media.links, data.media.media_omitted],
+                        backgroundColor: ['#f59e0b', '#ec4899', '#3b82f6', '#10b981'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } },
+                    cutout: '70%'
+                }
+            });
+        }
+        
+        // Render emojis
+        if (data.emojis) {
+            const emojiRow = document.getElementById('topEmojis');
+            emojiRow.innerHTML = '';
+            Object.entries(data.emojis).forEach(([emoji, count]) => {
+                emojiRow.innerHTML += `<div class="emoji-badge"><span class="emoji-char">${emoji}</span> <span class="emoji-count">${count}</span></div>`;
+            });
+        }
+    }
+    
+    function renderChecklists(text) {
+        // Convert markdown checkboxes and lists to custom styled checkboxes
+        const html = marked.parse(text);
+        return html.replace(/<li>/g, '<li class="checklist-item"><input type="checkbox" class="task-checkbox">');
+    }
+    
+    function renderMediaStats(mediaStats, emojis) {
+        mediaStatsContainer.classList.remove('hidden');
+        
+        // Stickers and GIFs
+        if (mediaStats) {
+            stickerCount.textContent = mediaStats.stickers || 0;
+            gifCount.textContent = mediaStats.gifs || 0;
+        }
+        
+        // Emojis
+        topEmojis.innerHTML = '';
+        if (emojis && Object.keys(emojis).length > 0) {
+            Object.entries(emojis).forEach(([emoji, count]) => {
+                const badge = document.createElement('div');
+                badge.className = 'emoji-badge';
+                badge.innerHTML = `<span class="emoji-char">${emoji}</span> <span class="emoji-count">${count}</span>`;
+                topEmojis.appendChild(badge);
+            });
+        } else {
+            topEmojis.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No emojis found in this chat.</p>';
+        }
+    }
+
+    // Export functionality — generate a clean PDF from a stored template
+    exportPdfBtn.addEventListener('click', () => {
+        exportPdfBtn.disabled = true;
+        exportPdfBtn.textContent = 'Generating PDF...';
+
+        const summaryHTML = document.getElementById('summaryText').innerHTML;
+        const profilesEl = document.getElementById('profilesText');
+        const profilesHTML = (profilesEl && profilesEl.innerHTML.trim()) ? profilesEl.innerHTML : '';
+
+        // Store everything in a variable and build a good UI for the PDF
+        const printContainer = document.createElement('div');
+        printContainer.innerHTML = `
+            <div style="font-family: 'Inter', sans-serif; color: #0f172a; padding: 40px; background: white;">
+                <h1 style="font-size: 24px; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px;">
+                    DocuChat AI - Summary Report
+                </h1>
+                
+                <div style="font-size: 14px; line-height: 1.6; color: #334155;">
+                    ${summaryHTML}
+                </div>
+                
+                ${profilesHTML ? `
+                <h2 style="font-size: 18px; color: #334155; margin-top: 30px; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Personality Profiles</h2>
+                <div style="font-size: 14px; line-height: 1.6; color: #334155;">
+                    ${profilesHTML}
+                </div>
+                ` : ''}
+                
+                <div style="margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                    Generated by DocuChat AI on ${new Date().toLocaleString()}
+                </div>
+            </div>
+        `;
+
+        const opt = {
+            margin:       0,
+            filename:     'AI_Summary_Report.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(printContainer).save().then(() => {
+            exportPdfBtn.disabled = false;
+            exportPdfBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Export to PDF`;
+        });
+    });
+
+    if(exportExcelBtn) exportExcelBtn.addEventListener('click', () => {
+        if (!globalFilteredStats) return;
+        
+        const wb = XLSX.utils.book_new();
+        
+        // Users Sheet
+        const userRows = Object.entries(globalFilteredStats).map(([user, count]) => ({ User: user, Messages: count }));
+        const wsUsers = XLSX.utils.json_to_sheet(userRows);
+        XLSX.utils.book_append_sheet(wb, wsUsers, "Users");
+        
+        // Media Sheet
+        if (globalMediaStats) {
+            const wsMedia = XLSX.utils.json_to_sheet([globalMediaStats]);
+            XLSX.utils.book_append_sheet(wb, wsMedia, "Media");
+        }
+        
+        // Emojis Sheet
+        if (globalEmojis) {
+            const emojiRows = Object.entries(globalEmojis).map(([emoji, count]) => ({ Emoji: emoji, Count: count }));
+            const wsEmojis = XLSX.utils.json_to_sheet(emojiRows);
+            XLSX.utils.book_append_sheet(wb, wsEmojis, "Top Emojis");
+        }
+        
+        // Timeline & Top Active Days
+        if (globalTimeSeries) {
+            const dailyCounts = [];
+            for (const [date, users] of Object.entries(globalTimeSeries)) {
+                const total = Object.values(users).reduce((a, b) => a + b, 0);
+                dailyCounts.push({ Date: date, 'Total Messages': total });
+            }
+            
+            // Timeline (chronological)
+            dailyCounts.sort((a, b) => a.Date.localeCompare(b.Date));
+            const wsTimeline = XLSX.utils.json_to_sheet(dailyCounts);
+            XLSX.utils.book_append_sheet(wb, wsTimeline, "Timeline");
+            
+            // Top Active Days (by count)
+            const topDays = [...dailyCounts].sort((a, b) => b['Total Messages'] - a['Total Messages']);
+            const wsTopDays = XLSX.utils.json_to_sheet(topDays);
+            XLSX.utils.book_append_sheet(wb, wsTopDays, "Top Active Days");
+        }
+
+        // Shared Links
+        if (typeof globalLinks !== 'undefined' && globalLinks && Object.keys(globalLinks).length > 0) {
+            const linkRows = Object.entries(globalLinks).map(([url, data]) => ({ 
+                URL: url, 
+                Count: data.count, 
+                Senders: data.senders.join(", ") 
+            }));
+            const wsLinks = XLSX.utils.json_to_sheet(linkRows);
+            XLSX.utils.book_append_sheet(wb, wsLinks, "Shared Links");
+        }
+
+        // Personality Profiles
+        const profilesEl = document.getElementById('profilesText');
+        if (profilesEl && profilesEl.innerText.trim()) {
+            const profilesRows = profilesEl.innerText.split('\n').filter(line => line.trim() !== '').map(line => ({ Profile: line.trim() }));
+            const wsProfiles = XLSX.utils.json_to_sheet(profilesRows);
+            XLSX.utils.book_append_sheet(wb, wsProfiles, "Personality Profiles");
+        }
+        
+        XLSX.writeFile(wb, "WhatsApp_Analytics.xlsx");
+    });
+
+    // Chat Widget Logic
+    document.querySelectorAll('.chat-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chatInput.value = chip.textContent;
+            sendChatMessage();
+        });
+    });
+
+    sendChatBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendChatMessage();
+    });
+
+    async function sendChatMessage() {
+        const text = chatInput.value.trim();
+        if (!text || !currentChatId) return;
+        
+        // Add user message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'chat-message user-message';
+        userMsg.textContent = text;
+        chatHistory.appendChild(userMsg);
+        
+        chatInput.value = '';
+        chatInput.disabled = true;
+        sendChatBtn.disabled = true;
+        
+        // Add loading bubble
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'chat-message ai-message';
+        loadingMsg.textContent = '...';
+        chatHistory.appendChild(loadingMsg);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: currentChatId, message: text })
+            });
+            const data = await response.json();
+            
+            chatHistory.removeChild(loadingMsg);
+            
+            if (!response.ok) throw new Error(data.error || 'Chat Error');
+            
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'chat-message ai-message';
+            aiMsg.innerHTML = marked.parse(data.response); // Use markdown for AI response
+            chatHistory.appendChild(aiMsg);
+            
+        } catch (error) {
+            chatHistory.removeChild(loadingMsg);
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'chat-message ai-message';
+            errorMsg.style.color = 'red';
+            errorMsg.textContent = 'Error: ' + error.message;
+            chatHistory.appendChild(errorMsg);
+        }
+        
+        chatInput.disabled = false;
+        sendChatBtn.disabled = false;
+        chatInput.focus();
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    if(exportChatPdfBtn) exportChatPdfBtn.addEventListener('click', () => {
+        document.querySelector('.chat-input-container').classList.add('hidden');
+        const historyOriginalHeight = chatHistory.style.height;
+        const historyOriginalMaxHeight = chatHistory.style.maxHeight;
+        const historyOriginalOverflow = chatHistory.style.overflow;
+        const historyOriginalOverflowY = chatHistory.style.overflowY;
+        
+        chatHistory.style.height = 'auto';
+        chatHistory.style.maxHeight = 'none';
+        chatHistory.style.overflow = 'visible';
+        chatHistory.style.overflowY = 'visible';
+        
+        const opt = {
+            margin:       0.5,
+            filename:     'QA_Chat_Log.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(chatWidget).save().then(() => {
+            document.querySelector('.chat-input-container').classList.remove('hidden');
+            chatHistory.style.height = historyOriginalHeight;
+            chatHistory.style.maxHeight = historyOriginalMaxHeight;
+            chatHistory.style.overflow = historyOriginalOverflow;
+            chatHistory.style.overflowY = historyOriginalOverflowY;
+        });
+    });
+
+    if(expandChatBtn) expandChatBtn.addEventListener('click', () => {
+        chatWidget.classList.toggle('fullscreen');
+        if (chatWidget.classList.contains('fullscreen')) {
+            document.body.style.overflow = 'hidden';
+            chatHistory.style.height = 'calc(100vh - 120px)';
+        } else {
+            document.body.style.overflow = 'auto';
+            chatHistory.style.height = '300px';
+        }
+    });
+
+    // Reset Flow
+    resetBtn.addEventListener('click', () => {
+        resetUI();
+    });
+
+    function resetUI() {
+        currentFile = null;
+        fileInput.value = '';
+        pasteInput.value = '';
+        dropZone.querySelector('h3').textContent = 'Drag & Drop your chat.txt or .zip';
+        dropZone.querySelector('p').textContent = 'or click to browse';
+        validateInput();
+        
+        if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+        }
+        
+        resultSection.classList.add('hidden');
+        uploadSection.classList.remove('hidden');
+        summaryText.innerHTML = '';
+        mediaStatsContainer.classList.add('hidden');
+    }
+});
