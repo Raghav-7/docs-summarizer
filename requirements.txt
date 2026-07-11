@@ -4,8 +4,8 @@ gunicorn==21.2.0
 Werkzeug==3.0.1
 
 # Database
-Flask-SQLAlchemy==3.1.1
-SQLAlchemy==2.0.23
+Flask-SQLAlchemy>=3.1.1
+SQLAlchemy>=2.0.30
 
 # Generative AI
 google-generativeai==0.8.3
