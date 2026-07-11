@@ -162,6 +162,35 @@ document.addEventListener('DOMContentLoaded', () => {
             progressText.textContent = `${progress}%`;
         }, 300);
 
+        let fileToUpload = currentFile;
+        
+        if (activeMode === 'upload' && currentFile && currentFile.name.toLowerCase().endsWith('.zip')) {
+            try {
+                progressText.textContent = 'Extracting...';
+                const zip = new JSZip();
+                const contents = await zip.loadAsync(currentFile);
+                let chatFile = null;
+                for (const relativePath in contents.files) {
+                    if (relativePath.endsWith('.txt')) {
+                        chatFile = contents.files[relativePath];
+                        break;
+                    }
+                }
+                if (chatFile) {
+                    const text = await chatFile.async('string');
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    fileToUpload = new File([blob], chatFile.name, { type: 'text/plain' });
+                } else {
+                    throw new Error('No .txt chat file found inside the zip.');
+                }
+            } catch (e) {
+                alert('Failed to extract zip file locally: ' + e.message);
+                clearInterval(loaderInterval);
+                resetUI();
+                return;
+            }
+        }
+
         const formData = new FormData();
         const summaryTypeSelect = document.getElementById('summaryType');
         if (summaryTypeSelect) {
@@ -169,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (activeMode === 'upload') {
-            formData.append('file', currentFile);
+            formData.append('file', fileToUpload);
         } else {
             formData.append('raw_text', pasteInput.value);
         }
@@ -259,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     aiFormData.append('file_id', statsData.file_id);
                 } else {
                     if (activeMode === 'upload') {
-                        aiFormData.append('file', currentFile);
+                        aiFormData.append('file', fileToUpload);
                     } else {
                         aiFormData.append('raw_text', pasteInput.value);
                     }
