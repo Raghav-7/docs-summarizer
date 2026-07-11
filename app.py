@@ -247,28 +247,25 @@ with app.app_context():
     db.create_all()
 
 # ─── Usage Limiter ────────────────────────────────────────────────
-def get_client_ip():
-    """Get the true client IP address, handling reverse proxies."""
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    return request.remote_addr or '127.0.0.1'
-
 def get_usage_count():
-    """Get today's usage count for current IP."""
-    ip = get_client_ip()
+    """Get today's usage count for current session."""
+    uid = session.get('uid')
+    if not uid: return 0
     today = date.today()
-    usage = Usage.query.filter_by(ip_address=ip, use_date=today).first()
+    usage = Usage.query.filter_by(ip_address=uid, use_date=today).first()
     return usage.count if usage else 0
 
 def increment_usage():
-    """Increment today's usage count for current IP."""
-    ip = get_client_ip()
+    """Increment today's usage count for current session."""
+    if 'uid' not in session:
+        session['uid'] = str(uuid.uuid4())
+    uid = session['uid']
     today = date.today()
-    usage = Usage.query.filter_by(ip_address=ip, use_date=today).first()
+    usage = Usage.query.filter_by(ip_address=uid, use_date=today).first()
     if usage:
         usage.count += 1
     else:
-        usage = Usage(ip_address=ip, use_date=today, count=1)
+        usage = Usage(ip_address=uid, use_date=today, count=1)
         db.session.add(usage)
     db.session.commit()
 
@@ -276,6 +273,8 @@ def check_rate_limit():
     """Check if current user has exceeded free limit. Returns (allowed, remaining)."""
     if session.get('logged_in'):
         return True, 999  # Admin has unlimited
+    if 'uid' not in session:
+        session['uid'] = str(uuid.uuid4())
     used = get_usage_count()
     remaining = max(0, FREE_DAILY_LIMIT - used)
     return remaining > 0, remaining
