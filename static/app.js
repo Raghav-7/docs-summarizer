@@ -659,15 +659,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chat Widget Logic
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.addEventListener('click', () => {
-            chatInput.value = chip.textContent;
+            if(chatInput) chatInput.value = chip.textContent;
             sendChatMessage();
         });
     });
 
-    sendChatBtn.addEventListener('click', sendChatMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
+    if (sendChatBtn) {
+        sendChatBtn.addEventListener('click', sendChatMessage);
+    }
+    
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+    }
 
     async function sendChatMessage() {
         const text = chatInput.value.trim();

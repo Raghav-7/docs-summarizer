@@ -563,7 +563,7 @@ def api_tool(tool_name):
     try:
         if raw_text:
             filename = "Pasted Text"
-            formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links = parse_chat(raw_text)
+            formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links, advanced_stats = parse_chat(raw_text)
             if not formatted_chat:
                 return jsonify({'error': 'Could not parse pasted text.'}), 400
             
@@ -614,7 +614,7 @@ def api_tool(tool_name):
                         with open(file_path, 'r', encoding='utf-8') as txt_file:
                             chat_text = txt_file.read()
                             
-                    formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links = parse_chat(chat_text)
+                    formatted_chat, stats, time_series, hourly_activity, media_stats, top_emojis, shared_links, advanced_stats = parse_chat(chat_text)
                     if not formatted_chat:
                         return jsonify({'error': 'Could not parse any messages from the uploaded file.'}), 400
                     
